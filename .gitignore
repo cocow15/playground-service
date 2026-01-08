@@ -1,0 +1,44 @@
+# Built application
+bin/
+obj/
+appsettings.Development.json
+appsettings.Production.json
+appsettings.json
+# User-specific files
+*.user
+*.userosscache
+*.suo
+
+# Visual Studio
+.vs/
+*.VisualState.xml
+
+# Visual Studio Code
+.vscode/
+
+# Rider
+.idea/
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# Environment variables
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# NuGet
+*.nuget.props
+*.nuget.targets
+project.lock.json
+project.fragment.lock.json
+artifacts/
