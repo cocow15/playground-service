@@ -161,6 +161,9 @@ app.UseIpRateLimiting();
 // CORS
 app.UseCors("DefaultCorsPolicy");
 
+// Custom Middleware to handle 404 -> 401
+app.UseMiddleware<NotFoundToUnauthorizedMiddleware>();
+
 // Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
