@@ -42,9 +42,9 @@ public class LteDayController : ControllerBase
             query = query.Where(x => x.DateTime >= startDateTime && x.DateTime <= endDateTime);
 
             // Apply site_id filter if provided
-            if (!string.IsNullOrWhiteSpace(request.SiteId))
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
             {
-                query = query.Where(x => x.SiteId == request.SiteId);
+                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
             }
 
             // Apply band filter if provided
@@ -159,7 +159,119 @@ public class LteDayController : ControllerBase
         }
     }
 
-    private static KpiChartDto BuildKpiChart<T>(
+    /// <summary>
+    /// Get Traffic and Payload KPI data (Aggregated by Site, Band, Cell, NE)
+    /// </summary>
+    [HttpPost("traffic-payload")]
+    public async Task<IActionResult> GetTrafficPayload([FromBody] LteDayKpiRequestDto request)
+    {
+        try
+        {
+            if (!DateOnly.TryParse(request.StartDate, out var startDate) ||
+                !DateOnly.TryParse(request.EndDate, out var endDate))
+            {
+                return BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD" });
+            }
+
+            var startDateTime = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDateTime = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var query = _context.LteDays.AsQueryable();
+            query = query.Where(x => x.DateTime >= startDateTime && x.DateTime <= endDateTime);
+
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
+                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
+
+            if (request.Bands != null && request.Bands.Count > 0)
+                query = query.Where(x => request.Bands.Contains(x.Band!));
+
+            if (request.CellNames != null && request.CellNames.Count > 0)
+                query = query.Where(x => request.CellNames.Contains(x.CellName!));
+
+            // Fetch Data including SectorGroup
+            var rawData = await query
+                .Select(x => new { x.DateTime, x.SiteId, x.Band, x.CellName, x.NeId, x.SectorGroup, x.TrafficErl, x.PayloadMb })
+                .ToListAsync();
+
+            var response = new TrafficPayloadResponseDto();
+
+            // Local Helper to build series
+            KpiChartDto BuildSeries(string chartName, string unit, IEnumerable<dynamic> groupedData, Func<dynamic, string> keySelector, Func<dynamic, double?> valueSelector)
+            {
+                var chart = new KpiChartDto { Name = chartName, Unit = unit };
+                foreach (var group in groupedData)
+                {
+                    string seriesName = keySelector(group);
+                    var points = new List<KpiDataPointDto>();
+                    var groupList = (IEnumerable<dynamic>)group;
+                    
+                    // Aggregate by Date
+                    var dateGroups = groupList.GroupBy(x => ((DateTime)x.DateTime).ToString("yyyy-MM-dd"));
+                    
+                    foreach(var dateGroup in dateGroups)
+                    {
+                        double? sum = dateGroup.Sum(x => (double?)valueSelector(x));
+                        points.Add(new KpiDataPointDto { 
+                            Date = dateGroup.Key, 
+                            Value = sum.HasValue ? Math.Round(sum.Value, 2) : null
+                        });
+                    }
+                    // Sort points by date
+                    points = points.OrderBy(p => p.Date).ToList();
+                    chart.Series.Add(new CellSeriesDto { CellName = seriesName, Data = points });
+                }
+                // Sort series by name
+                chart.Series = chart.Series.OrderBy(s => s.CellName).ToList();
+                return chart;
+            }
+
+            // Helper for Aggregated Set
+            AggregatedSectorKpiDto BuildAggregatedSet(string categoryName, string unit, IEnumerable<dynamic> sourceData, Func<dynamic, string> keySelector, Func<dynamic, double?> valueSelector)
+            {
+                var dto = new AggregatedSectorKpiDto();
+                
+                // Total (Summary)
+                var totalGrouped = sourceData.GroupBy(keySelector);
+                dto.Total = BuildSeries($"{categoryName} - Total", unit, totalGrouped, g => g.Key ?? "Unknown", valueSelector);
+
+                // Sector 1
+                var sec1Data = sourceData.Where(x => x.SectorGroup == 1).GroupBy(keySelector);
+                dto.Sector1 = BuildSeries($"{categoryName} - Sector 1", unit, sec1Data, g => g.Key ?? "Unknown", valueSelector);
+
+                // Sector 2
+                var sec2Data = sourceData.Where(x => x.SectorGroup == 2).GroupBy(keySelector);
+                dto.Sector2 = BuildSeries($"{categoryName} - Sector 2", unit, sec2Data, g => g.Key ?? "Unknown", valueSelector);
+
+                // Sector 3
+                var sec3Data = sourceData.Where(x => x.SectorGroup == 3).GroupBy(keySelector);
+                dto.Sector3 = BuildSeries($"{categoryName} - Sector 3", unit, sec3Data, g => g.Key ?? "Unknown", valueSelector);
+
+                return dto;
+            }
+
+            // --- Payload Construction ---
+            response.PayloadBySite = BuildAggregatedSet("Site", "MB", rawData, x => x.SiteId, x => x.PayloadMb);
+            response.PayloadByBand = BuildAggregatedSet("Band", "MB", rawData, x => x.Band, x => x.PayloadMb);
+            response.PayloadByCell = BuildAggregatedSet("Cell", "MB", rawData, x => x.CellName, x => x.PayloadMb);
+            response.PayloadByNe   = BuildAggregatedSet("NE",   "MB", rawData, x => x.NeId, x => x.PayloadMb);
+
+            // --- Traffic Construction ---
+            response.TrafficBySite = BuildAggregatedSet("Site", "Erl", rawData, x => x.SiteId, x => x.TrafficErl);
+            response.TrafficByBand = BuildAggregatedSet("Band", "Erl", rawData, x => x.Band,   x => x.TrafficErl);
+            response.TrafficByCell = BuildAggregatedSet("Cell", "Erl", rawData, x => x.CellName, x => x.TrafficErl);
+            response.TrafficByNe   = BuildAggregatedSet("NE",   "Erl", rawData, x => x.NeId,   x => x.TrafficErl);
+
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching Traffic Payload data");
+            return StatusCode(500, new { error = "Failed to fetch Traffic Payload data" });
+        }
+    }
+
+    private KpiChartDto BuildKpiChart<T>(
         string name,
         string unit,
         List<T> data,
@@ -173,7 +285,9 @@ public class LteDayController : ControllerBase
             Series = new List<CellSeriesDto>()
         };
 
-        // Get DateTime and CellName using reflection (simplified approach)
+        // Get DateTime and CellName using reflection (simplified approach given our anonymous type earlier matches)
+        // Note: The rawData in GetKpiData is List<AnonymousType>, so T is AnonymousType.
+        // Reflection works on AnonymousTypes.
         var dateTimeProp = typeof(T).GetProperty("DateTime");
         var cellNameProp = typeof(T).GetProperty("CellName");
 

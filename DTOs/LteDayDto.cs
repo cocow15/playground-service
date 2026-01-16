@@ -5,7 +5,7 @@ namespace AuthService.DTOs;
 /// </summary>
 public class LteDayKpiRequestDto
 {
-    public string? SiteId { get; set; }
+    public List<string> SiteIds { get; set; } = new();
     public List<string> Bands { get; set; } = new();
     public List<string> CellNames { get; set; } = new();
     public string StartDate { get; set; } = string.Empty;
@@ -89,4 +89,30 @@ public class SectorKpiDto
 public class LteDayKpiResponseDto
 {
     public List<SectorKpiDto> Sectors { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO for Traffic and Payload aggregated data
+/// </summary>
+public class TrafficPayloadResponseDto
+{
+    // Payload
+    public AggregatedSectorKpiDto PayloadBySite { get; set; } = new();
+    public AggregatedSectorKpiDto PayloadByCell { get; set; } = new();
+    public AggregatedSectorKpiDto PayloadByBand { get; set; } = new();
+    public AggregatedSectorKpiDto PayloadByNe { get; set; } = new();
+    
+    // Traffic
+    public AggregatedSectorKpiDto TrafficBySite { get; set; } = new();
+    public AggregatedSectorKpiDto TrafficByCell { get; set; } = new();
+    public AggregatedSectorKpiDto TrafficByBand { get; set; } = new();
+    public AggregatedSectorKpiDto TrafficByNe { get; set; } = new();
+}
+
+public class AggregatedSectorKpiDto
+{
+    public KpiChartDto Total { get; set; } = new();
+    public KpiChartDto Sector1 { get; set; } = new();
+    public KpiChartDto Sector2 { get; set; } = new();
+    public KpiChartDto Sector3 { get; set; } = new();
 }

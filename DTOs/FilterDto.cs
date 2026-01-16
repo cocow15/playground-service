@@ -21,7 +21,7 @@ public class SiteIdFilterRequestDto
 /// </summary>
 public class BandFilterRequestDto
 {
-    public string? SiteId { get; set; }
+    public List<string> SiteIds { get; set; } = new();
     public string? Keyword { get; set; }
 }
 
@@ -30,7 +30,7 @@ public class BandFilterRequestDto
 /// </summary>
 public class CellNameFilterRequestDto
 {
-    public string? SiteId { get; set; }
+    public List<string> SiteIds { get; set; } = new();
     public List<string> Bands { get; set; } = new();
     public string? Keyword { get; set; }
 }

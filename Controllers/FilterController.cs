@@ -58,9 +58,9 @@ public class FilterController : ControllerBase
         {
             var query = _context.RefLteDays.AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(request.SiteId))
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
             {
-                query = query.Where(x => x.SiteId == request.SiteId);
+                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
             }
 
             var bandQuery = query.Select(x => x.Band).Distinct();
@@ -93,9 +93,9 @@ public class FilterController : ControllerBase
         {
             var query = _context.RefLteDays.AsQueryable();
 
-            if (!string.IsNullOrWhiteSpace(request.SiteId))
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
             {
-                query = query.Where(x => x.SiteId == request.SiteId);
+                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
             }
 
             if (request.Bands != null && request.Bands.Count > 0)
