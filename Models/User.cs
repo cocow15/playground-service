@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace AuthService.Models;
 
-[Table("users", Schema = "cep")]
+[Table("users", Schema = "dashboard")]
 [Index(nameof(Username), IsUnique = true)]
 [Index(nameof(Email), IsUnique = true)]
 public class User

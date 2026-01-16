@@ -37,7 +37,7 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.RequireHttpsMetadata = true; // Require HTTPS in production
+    options.RequireHttpsMetadata = false; // Allow HTTP in production
     options.SaveToken = true;
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -153,20 +153,23 @@ app.UseMiddleware<SecurityHeadersMiddleware>();
 app.UseMiddleware<RequestLoggingMiddleware>();
 
 // HTTPS redirection
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
+
+// CORS - MUST BE EARLY in the pipeline, before authentication
+app.UseCors("DefaultCorsPolicy");
 
 // Rate limiting
 app.UseIpRateLimiting();
 
-// CORS
-app.UseCors("DefaultCorsPolicy");
-
-// Custom Middleware to handle 404 -> 401
-app.UseMiddleware<NotFoundToUnauthorizedMiddleware>();
+// Routing
+app.UseRouting();
 
 // Authentication & Authorization
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Custom Middleware to handle 404 -> 401 (AFTER authentication)
+app.UseMiddleware<NotFoundToUnauthorizedMiddleware>();
 
 // Map controllers
 app.MapControllers();

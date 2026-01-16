@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AuthService.Models;
 
-[Table("refresh_tokens", Schema = "cep")]
+[Table("refresh_tokens", Schema = "dashboard")]
 public class RefreshToken
 {
     [Key]

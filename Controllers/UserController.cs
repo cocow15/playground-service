@@ -43,23 +43,23 @@ public class UserController : ControllerBase
         });
     }
 
-    /// <summary>
-    /// Test endpoint - Another example of protected endpoint
-    /// </summary>
-    [HttpGet("test")]
-    public IActionResult TestEndpoint()
-    {
-        var username = User.Identity?.Name ?? "Unknown";
+    // /// <summary>
+    // /// Test endpoint - Another example of protected endpoint
+    // /// </summary>
+    // [HttpGet("test")]
+    // public IActionResult TestEndpoint()
+    // {
+    //     var username = User.Identity?.Name ?? "Unknown";
         
-        _logger.LogInformation("Test endpoint accessed by: {Username}", username);
+    //     _logger.LogInformation("Test endpoint accessed by: {Username}", username);
 
-        return Ok(new
-        {
-            message = "You have successfully accessed a protected endpoint!",
-            username = username,
-            timestamp = DateTime.UtcNow
-        });
-    }
+    //     return Ok(new
+    //     {
+    //         message = "You have successfully accessed a protected endpoint!",
+    //         username = username,
+    //         timestamp = DateTime.UtcNow
+    //     });
+    // }
 
     /// <summary>
     /// Get all user claims - Shows all JWT token claims
