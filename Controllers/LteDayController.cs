@@ -44,7 +44,7 @@ public class LteDayController : ControllerBase
             // Apply site_id filter if provided
             if (request.SiteIds != null && request.SiteIds.Count > 0)
             {
-                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
+                query = query.Where(x => x.SiteId != null && request.SiteIds.Contains(x.SiteId));
             }
 
             // Apply band filter if provided
@@ -180,7 +180,7 @@ public class LteDayController : ControllerBase
             query = query.Where(x => x.DateTime >= startDateTime && x.DateTime <= endDateTime);
 
             if (request.SiteIds != null && request.SiteIds.Count > 0)
-                query = query.Where(x => request.SiteIds.Contains(x.SiteId));
+                query = query.Where(x => x.SiteId != null && request.SiteIds.Contains(x.SiteId));
 
             if (request.Bands != null && request.Bands.Count > 0)
                 query = query.Where(x => request.Bands.Contains(x.Band!));

@@ -14,6 +14,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<RefreshToken> RefreshTokens { get; set; }
     public DbSet<RefLteDay> RefLteDays { get; set; }
     public DbSet<LteDay> LteDays { get; set; }
+    public DbSet<PacketLoss> PacketLosses { get; set; }
+    public DbSet<RefNePacketLoss> RefNePacketLosses { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -144,6 +146,33 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.VoltePayUl).HasColumnName("VOLTE PAY UL");
             entity.Property(e => e.PayloadGb).HasColumnName("PAYLOAD GB");
             entity.Property(e => e.TrafficErl).HasColumnName("TRAFFIC ERL");
+        });
+
+        // PacketLoss configuration
+        modelBuilder.Entity<PacketLoss>(entity =>
+        {
+            entity.ToTable("packet_loss", "dashboard");
+            entity.HasNoKey(); 
+
+            entity.Property(e => e.Date).HasColumnName("date_id");
+            entity.Property(e => e.NeName).HasColumnName("ne_name");
+            entity.Property(e => e.PacketLossRatioFwd).HasColumnName("packetlossratiofwd");
+            entity.Property(e => e.PacketLossRatioRev).HasColumnName("packetlossratiorev");
+            entity.Property(e => e.TwampLatencyAvg).HasColumnName("twamp_latency_avg");
+            entity.Property(e => e.TwampPlAvg).HasColumnName("twamp_pl_avg");
+            entity.Property(e => e.TwampPlMax).HasColumnName("twamp_pl_max");
+            entity.Property(e => e.SctpPacketLoss).HasColumnName("sctp_packet_loss");
+            entity.Property(e => e.SourceFile).HasColumnName("source_file");
+            entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
+        });
+
+        // RefNePacketLoss configuration (materialized view)
+        modelBuilder.Entity<RefNePacketLoss>(entity =>
+        {
+            entity.ToTable("mv_ref_ne_packet_loss", "dashboard");
+            entity.HasNoKey();
+            
+            entity.Property(e => e.NeName).HasColumnName("ne_name");
         });
     }
 }
