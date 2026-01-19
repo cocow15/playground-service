@@ -51,4 +51,15 @@ public class LteDay
     public double? VoltePayUl { get; set; }
     public double? PayloadGb { get; set; }
     public double? TrafficErl { get; set; }
+    public double? ActiveUserDl { get; set; }
+    public double? Qpsk { get; set; }
+    
+    // BusyHour KPIs
+    public double? CqiBusyhour { get; set; }
+    public double? SeBusyhour { get; set; }
+    public double? UserDlThpBusyhour { get; set; }
+    public double? UserUlThpBusyhour { get; set; }
+    public double? CellDlThpBusyhour { get; set; }
+    public double? CellUlThpBusyhour { get; set; }
+    public double? CaPayloadGb { get; set; }
 }

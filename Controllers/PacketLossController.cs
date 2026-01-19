@@ -72,30 +72,127 @@ public class PacketLossController : ControllerBase
                 query = query.Where(x => request.NeNames.Contains(x.NeName));
             }
 
-            var rawData = await query
-                .Select(x => new
-                {
-                    x.Date,
-                    x.NeName,
-                    x.TwampPlAvg,
-                    x.TwampPlMax,
-                    x.SctpPacketLoss
-                })
-                .OrderBy(x => x.Date)
-                .ToListAsync();
+            if (request.Mode?.ToLower() == "hourly")
+            {
+                 var hourlyQuery = _context.PacketLossHourlies.AsQueryable();
 
-            // Helper to parse strings safely (e.g. "", "0.23", null)
+                // complex "hourly" logic
+                // StartDate/EndDate come as "YYYY-MM-DD HH:00" or just "YYYY-MM-DD" depending...
+                // But FE sends "YYYY-MM-DD HH:00" for hourly.
+                
+                DateTime sDt, eDt;
+                // Fallback parsing
+                if (!DateTime.TryParse(request.StartDate, out sDt)) sDt = DateTime.Parse(request.StartDate.Substring(0, 10));
+                if (!DateTime.TryParse(request.EndDate, out eDt)) eDt = DateTime.Parse(request.EndDate.Substring(0, 10));
+
+                var sDateStr = sDt.ToString("yyyy-MM-dd");
+                var sHour = sDt.Hour;
+                
+                var eDateStr = eDt.ToString("yyyy-MM-dd");
+                var eHour = eDt.Hour;
+
+                // Filter logic:
+                // (Date > sDate OR (Date == sDate AND Hour >= sHour))
+                // AND
+                // (Date < eDate OR (Date == eDate AND Hour <= eHour))
+                
+                // Note: HourId is string in DB? Model says 'string'.
+                // If it contains "9", "10", "0", etc. we need integer comparison.
+                // EF Core translation for Convert.ToInt32(x.HourId) depends on provider.
+                // Assuming standard numeric string.
+                
+                hourlyQuery = hourlyQuery.Where(x => 
+                    (x.Date.CompareTo(sDateStr) > 0 || (x.Date == sDateStr && Convert.ToInt32(x.HourId) >= sHour)) &&
+                    (x.Date.CompareTo(eDateStr) < 0 || (x.Date == eDateStr && Convert.ToInt32(x.HourId) <= eHour))
+                );
+
+                if (request.NeNames != null && request.NeNames.Count > 0)
+                {
+                    hourlyQuery = hourlyQuery.Where(x => request.NeNames.Contains(x.NeName));
+                }
+
+                var rawHourlyData = await hourlyQuery
+                    .Select(x => new
+                    {
+                        x.Date,
+                        x.HourId,
+                        x.NeName,
+                        x.TwampPlAvg,
+                        x.TwampPlMax,
+                        x.SctpPacketLoss
+                    })
+                    .ToListAsync();
+
+                var processedData = rawHourlyData
+                    .Select(x => new 
+                    {
+                        Date = $"{x.Date} {x.HourId.PadLeft(2, '0')}:00", 
+                        x.NeName,
+                        x.TwampPlAvg,
+                        x.TwampPlMax,
+                        x.SctpPacketLoss
+                    })
+                    .OrderBy(x => x.Date)
+                    .ToList();
+                
+                 var mappedData = processedData.Select(x => new 
+                 {
+                     x.Date,
+                     x.NeName,
+                     x.TwampPlAvg,
+                     x.TwampPlMax,
+                     x.SctpPacketLoss
+                 }).ToList();
+
+                 return ProcessPacketLossResponse(mappedData);
+            }
+            else
+            {
+                var rawData = await query
+                    .Select(x => new
+                    {
+                        x.Date,
+                        x.NeName,
+                        x.TwampPlAvg,
+                        x.TwampPlMax,
+                        x.SctpPacketLoss
+                    })
+                    .OrderBy(x => x.Date)
+                    .ToListAsync();
+
+                return ProcessPacketLossResponse(rawData);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching Packet Loss data");
+            return StatusCode(500, new { error = "Failed to fetch Packet Loss data" });
+        }
+    }
+
+    private IActionResult ProcessPacketLossResponse<T>(List<T> rawData) where T : class
+    {
             double? ParseDouble(string? val)
             {
                 if (string.IsNullOrWhiteSpace(val)) return null;
                 if (double.TryParse(val, out var d)) return d;
                 return null;
             }
+            
+            var standardData = rawData.Select(x => {
+                var type = x.GetType();
+                return new 
+                {
+                    Date = (type.GetProperty("Date")?.GetValue(x) as string) ?? string.Empty,
+                    NeName = (type.GetProperty("NeName")?.GetValue(x) as string) ?? string.Empty,
+                    TwampPlAvg = type.GetProperty("TwampPlAvg")?.GetValue(x) as string,
+                    TwampPlMax = type.GetProperty("TwampPlMax")?.GetValue(x) as string,
+                    SctpPacketLoss = type.GetProperty("SctpPacketLoss")?.GetValue(x) as string
+                };
+            }).ToList();
 
             var response = new PacketLossResponseDto();
-
-            // Group by NE for series
-            var groupedByNe = rawData.GroupBy(x => x.NeName).ToList();
+            var groupedByNe = standardData.GroupBy(x => x.NeName).ToList();
 
             // 1. TWAMP PL AVG
             var avgChart = new KpiChartDto { Name = "TWAMP PL AVG", Unit = "%" };
@@ -105,13 +202,13 @@ public class PacketLossController : ControllerBase
                     .GroupBy(x => x.Date)
                     .Select(g => new KpiDataPointDto
                     {
-                        Date = g.Key,
+                        Date = g.Key ?? string.Empty,
                         Value = g.Average(x => ParseDouble(x.TwampPlAvg))
                     })
                     .OrderBy(p => p.Date)
                     .ToList();
 
-                avgChart.Series.Add(new CellSeriesDto { CellName = group.Key, Data = points });
+                avgChart.Series.Add(new CellSeriesDto { CellName = group.Key ?? string.Empty, Data = points });
             }
             response.TwampPlAvg = avgChart;
 
@@ -123,13 +220,13 @@ public class PacketLossController : ControllerBase
                     .GroupBy(x => x.Date)
                     .Select(g => new KpiDataPointDto
                     {
-                        Date = g.Key,
+                        Date = g.Key ?? string.Empty,
                         Value = g.Max(x => ParseDouble(x.TwampPlMax))
                     })
                     .OrderBy(p => p.Date)
                     .ToList();
 
-                maxChart.Series.Add(new CellSeriesDto { CellName = group.Key, Data = points });
+                maxChart.Series.Add(new CellSeriesDto { CellName = group.Key ?? string.Empty, Data = points });
             }
             response.TwampPlMax = maxChart;
 
@@ -141,23 +238,17 @@ public class PacketLossController : ControllerBase
                     .GroupBy(x => x.Date)
                     .Select(g => new KpiDataPointDto
                     {
-                        Date = g.Key,
-                        Value = g.Average(x => ParseDouble(x.SctpPacketLoss)) // Assuming average is okay for multiple entries per day?
+                        Date = g.Key ?? string.Empty,
+                        Value = g.Average(x => ParseDouble(x.SctpPacketLoss)) 
                     })
                     .OrderBy(p => p.Date)
                     .ToList();
 
-                sctpChart.Series.Add(new CellSeriesDto { CellName = group.Key, Data = points });
+                sctpChart.Series.Add(new CellSeriesDto { CellName = group.Key ?? string.Empty, Data = points });
             }
             response.SctpPacketLoss = sctpChart;
 
             return Ok(response);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching Packet Loss data");
-            return StatusCode(500, new { error = "Failed to fetch Packet Loss data" });
-        }
     }
 }
 
@@ -166,6 +257,7 @@ public class PacketLossFilterDto
     public string StartDate { get; set; } = string.Empty;
     public string EndDate { get; set; } = string.Empty;
     public List<string> NeNames { get; set; } = new();
+    public string Mode { get; set; } = "daily"; // "daily" or "hourly"
 }
 
 public class PacketLossResponseDto

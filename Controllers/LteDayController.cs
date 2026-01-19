@@ -89,7 +89,9 @@ public class LteDayController : ControllerBase
                     x.MaxActiveUser,
                     x.MaxRrcUser,
                     x.TrafficErl,
-                    x.PayloadMb
+                    x.PayloadMb,
+                    x.ActiveUserDl,
+                    x.Qpsk
                 })
                 .OrderBy(x => x.DateTime)
                 .ToListAsync();
@@ -144,7 +146,10 @@ public class LteDayController : ControllerBase
                     MaxRrcUser = BuildKpiChart("Max RRC User", "", sectorData, cellNames, x => x.MaxRrcUser),
                     // Bottom KPIs - Traffic first, then Payload
                     TrafficErl = BuildKpiChart("Traffic", "Erl", sectorData, cellNames, x => x.TrafficErl),
-                    PayloadMb = BuildKpiChart("Payload", "MB", sectorData, cellNames, x => x.PayloadMb)
+                    PayloadMb = BuildKpiChart("Payload", "MB", sectorData, cellNames, x => x.PayloadMb),
+                    // New KPIs - Active User DL and QPSK
+                    ActiveUserDl = BuildKpiChart("Active User DL", "", sectorData, cellNames, x => x.ActiveUserDl),
+                    Qpsk = BuildKpiChart("QPSK", "%", sectorData, cellNames, x => x.Qpsk)
                 };
 
                 response.Sectors.Add(sectorKpi);
@@ -156,6 +161,215 @@ public class LteDayController : ControllerBase
         {
             _logger.LogError(ex, "Error fetching LTE Day KPI data");
             return StatusCode(500, new { error = "Failed to fetch KPI data" });
+        }
+    }
+
+    /// <summary>
+    /// Get BusyHour KPI and CA Payload data grouped by sector
+    /// </summary>
+    [HttpPost("busyhour-kpi")]
+    public async Task<IActionResult> GetBusyHourKpi([FromBody] LteDayKpiRequestDto request)
+    {
+        try
+        {
+            // Parse dates
+            if (!DateOnly.TryParse(request.StartDate, out var startDate) ||
+                !DateOnly.TryParse(request.EndDate, out var endDate))
+            {
+                return BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD" });
+            }
+
+            var startDateTime = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDateTime = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var query = _context.LteDays.AsQueryable();
+
+            // Apply date filter
+            query = query.Where(x => x.DateTime >= startDateTime && x.DateTime <= endDateTime);
+
+            // Apply site_id filter if provided
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
+            {
+                query = query.Where(x => x.SiteId != null && request.SiteIds.Contains(x.SiteId));
+            }
+
+            // Apply band filter if provided
+            if (request.Bands != null && request.Bands.Count > 0)
+            {
+                query = query.Where(x => request.Bands.Contains(x.Band!));
+            }
+
+            // Apply cellname filter if provided
+            if (request.CellNames != null && request.CellNames.Count > 0)
+            {
+                query = query.Where(x => request.CellNames.Contains(x.CellName!));
+            }
+
+            // Get raw data for BusyHour KPIs
+            var rawData = await query
+                .Select(x => new
+                {
+                    x.DateTime,
+                    x.SectorGroup,
+                    x.CellName,
+                    x.CqiBusyhour,
+                    x.SeBusyhour,
+                    x.UserDlThpBusyhour,
+                    x.UserUlThpBusyhour,
+                    x.CellDlThpBusyhour,
+                    x.CellUlThpBusyhour,
+                    x.CaPayloadGb
+                })
+                .OrderBy(x => x.DateTime)
+                .ToListAsync();
+
+            // Group by SectorGroup
+            var sectorGroups = rawData
+                .Where(x => x.SectorGroup.HasValue)
+                .GroupBy(x => x.SectorGroup!.Value)
+                .OrderBy(g => g.Key);
+
+            var response = new BusyHourKpiResponseDto();
+
+            foreach (var sectorGroup in sectorGroups)
+            {
+                var sectorData = sectorGroup.ToList();
+                var cellNames = sectorData
+                    .Where(x => !string.IsNullOrEmpty(x.CellName))
+                    .Select(x => x.CellName!)
+                    .Distinct()
+                    .OrderBy(x => x)
+                    .ToList();
+
+                var sectorKpi = new BusyHourSectorKpiDto
+                {
+                    SectorGroup = sectorGroup.Key,
+                    CqiBusyhour = BuildKpiChart("CQI BusyHour", "", sectorData, cellNames, x => x.CqiBusyhour),
+                    SeBusyhour = BuildKpiChart("SE BusyHour", "bps/Hz", sectorData, cellNames, x => x.SeBusyhour),
+                    UserDlThpBusyhour = BuildKpiChart("User DL THP BusyHour", "Mbps", sectorData, cellNames, x => x.UserDlThpBusyhour),
+                    UserUlThpBusyhour = BuildKpiChart("User UL THP BusyHour", "Mbps", sectorData, cellNames, x => x.UserUlThpBusyhour),
+                    CellDlThpBusyhour = BuildKpiChart("Cell DL THP BusyHour", "Mbps", sectorData, cellNames, x => x.CellDlThpBusyhour),
+                    CellUlThpBusyhour = BuildKpiChart("Cell UL THP BusyHour", "Mbps", sectorData, cellNames, x => x.CellUlThpBusyhour),
+                    CaPayloadGb = BuildKpiChart("CA Payload", "GB", sectorData, cellNames, x => x.CaPayloadGb)
+                };
+
+                response.Sectors.Add(sectorKpi);
+            }
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching BusyHour KPI data");
+            return StatusCode(500, new { error = "Failed to fetch BusyHour KPI data" });
+        }
+    }
+
+    /// <summary>
+    /// Get BusyHour Stacked Payload data (PAYLOAD GB and CA_PAYLOAD_GB) grouped by cell/sector, band, site
+    /// </summary>
+    [HttpPost("busyhour-stacked-payload")]
+    public async Task<IActionResult> GetBusyHourStackedPayload([FromBody] LteDayKpiRequestDto request)
+    {
+        try
+        {
+            if (!DateOnly.TryParse(request.StartDate, out var startDate) ||
+                !DateOnly.TryParse(request.EndDate, out var endDate))
+            {
+                return BadRequest(new { error = "Invalid date format. Use YYYY-MM-DD" });
+            }
+
+            var startDateTime = startDate.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
+            var endDateTime = endDate.ToDateTime(TimeOnly.MaxValue, DateTimeKind.Utc);
+
+            var query = _context.LteDays.AsQueryable();
+            query = query.Where(x => x.DateTime >= startDateTime && x.DateTime <= endDateTime);
+
+            if (request.SiteIds != null && request.SiteIds.Count > 0)
+                query = query.Where(x => x.SiteId != null && request.SiteIds.Contains(x.SiteId));
+
+            if (request.Bands != null && request.Bands.Count > 0)
+                query = query.Where(x => request.Bands.Contains(x.Band!));
+
+            if (request.CellNames != null && request.CellNames.Count > 0)
+                query = query.Where(x => request.CellNames.Contains(x.CellName!));
+
+            var rawData = await query
+                .Select(x => new { x.DateTime, x.SiteId, x.Band, x.CellName, x.SectorGroup, x.PayloadGb, x.CaPayloadGb })
+                .ToListAsync();
+
+            var response = new BusyHourStackedPayloadResponseDto();
+
+            // Helper: Build stacked series by grouping key
+            KpiChartDto BuildStackedSeries(string chartName, string unit, IEnumerable<dynamic> groupedData, Func<dynamic, string?> keySelector, Func<dynamic, double?> valueSelector)
+            {
+                var chart = new KpiChartDto { Name = chartName, Unit = unit };
+                foreach (var group in groupedData)
+                {
+                    string? seriesName = keySelector(group);
+                    var points = new List<KpiDataPointDto>();
+                    var groupList = (IEnumerable<dynamic>)group;
+                    var dateGroups = groupList.GroupBy(x => ((DateTime)x.DateTime).ToString("yyyy-MM-dd"));
+                    foreach (var dateGroup in dateGroups)
+                    {
+                        double? sum = dateGroup.Sum(x => (double?)valueSelector(x));
+                        points.Add(new KpiDataPointDto
+                        {
+                            Date = dateGroup.Key,
+                            Value = sum.HasValue ? Math.Round(sum.Value, 2) : null
+                        });
+                    }
+                    points = points.OrderBy(p => p.Date).ToList();
+                    chart.Series.Add(new CellSeriesDto { CellName = seriesName ?? "Unknown", Data = points });
+                }
+                chart.Series = chart.Series.OrderBy(s => s.CellName).ToList();
+                return chart;
+            }
+
+            // Helper: Build aggregated by sector for cell grouping
+            AggregatedSectorKpiDto BuildCellBySector(string categoryName, string unit, Func<dynamic, double?> valueSelector)
+            {
+                var dto = new AggregatedSectorKpiDto();
+                
+                // Total
+                var totalGrouped = rawData.GroupBy(x => x.CellName);
+                dto.Total = BuildStackedSeries($"{categoryName} - Total", unit, totalGrouped, g => g.Key, valueSelector);
+
+                // Sector 1
+                var sec1Data = rawData.Where(x => x.SectorGroup == 1).GroupBy(x => x.CellName);
+                dto.Sector1 = BuildStackedSeries($"{categoryName} - S1", unit, sec1Data, g => g.Key, valueSelector);
+
+                // Sector 2
+                var sec2Data = rawData.Where(x => x.SectorGroup == 2).GroupBy(x => x.CellName);
+                dto.Sector2 = BuildStackedSeries($"{categoryName} - S2", unit, sec2Data, g => g.Key, valueSelector);
+
+                // Sector 3
+                var sec3Data = rawData.Where(x => x.SectorGroup == 3).GroupBy(x => x.CellName);
+                dto.Sector3 = BuildStackedSeries($"{categoryName} - S3", unit, sec3Data, g => g.Key, valueSelector);
+
+                return dto;
+            }
+
+            // PAYLOAD GB
+            response.PayloadGbByCell = BuildCellBySector("Payload GB", "GB", x => x.PayloadGb);
+            var payloadByBandGrouped = rawData.GroupBy(x => x.Band);
+            response.PayloadGbByBand = BuildStackedSeries("Payload GB - Band", "GB", payloadByBandGrouped, g => g.Key, x => x.PayloadGb);
+            var payloadBySiteGrouped = rawData.GroupBy(x => x.SiteId);
+            response.PayloadGbBySite = BuildStackedSeries("Payload GB - Site", "GB", payloadBySiteGrouped, g => g.Key, x => x.PayloadGb);
+
+            // CA PAYLOAD GB
+            response.CaPayloadGbByCell = BuildCellBySector("CA Payload", "GB", x => x.CaPayloadGb);
+            var caPayloadByBandGrouped = rawData.GroupBy(x => x.Band);
+            response.CaPayloadGbByBand = BuildStackedSeries("CA Payload - Band", "GB", caPayloadByBandGrouped, g => g.Key, x => x.CaPayloadGb);
+            var caPayloadBySiteGrouped = rawData.GroupBy(x => x.SiteId);
+            response.CaPayloadGbBySite = BuildStackedSeries("CA Payload - Site", "GB", caPayloadBySiteGrouped, g => g.Key, x => x.CaPayloadGb);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching BusyHour Stacked Payload data");
+            return StatusCode(500, new { error = "Failed to fetch BusyHour Stacked Payload data" });
         }
     }
 

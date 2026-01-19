@@ -15,7 +15,11 @@ public class ApplicationDbContext : DbContext
     public DbSet<RefLteDay> RefLteDays { get; set; }
     public DbSet<LteDay> LteDays { get; set; }
     public DbSet<PacketLoss> PacketLosses { get; set; }
+    public DbSet<PacketLossHourly> PacketLossHourlies { get; set; }
     public DbSet<RefNePacketLoss> RefNePacketLosses { get; set; }
+    public DbSet<GsmDay> GsmDays { get; set; }
+    public DbSet<RefGsmDay> RefGsmDays { get; set; }
+    // public DbSet<RefLayer3> RefLayer3s { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -146,6 +150,17 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.VoltePayUl).HasColumnName("VOLTE PAY UL");
             entity.Property(e => e.PayloadGb).HasColumnName("PAYLOAD GB");
             entity.Property(e => e.TrafficErl).HasColumnName("TRAFFIC ERL");
+            entity.Property(e => e.ActiveUserDl).HasColumnName("ACTIVE USER DL");
+            entity.Property(e => e.Qpsk).HasColumnName("qpsk");
+            
+            // BusyHour KPIs
+            entity.Property(e => e.CqiBusyhour).HasColumnName("cqi_busyhour");
+            entity.Property(e => e.SeBusyhour).HasColumnName("se_busyhour");
+            entity.Property(e => e.UserDlThpBusyhour).HasColumnName("USER DL THP BUSYHOUR");
+            entity.Property(e => e.UserUlThpBusyhour).HasColumnName("USER UL THP BUSYJOUR");
+            entity.Property(e => e.CellDlThpBusyhour).HasColumnName("CELL DL THP BUSYHOUR");
+            entity.Property(e => e.CellUlThpBusyhour).HasColumnName("CELL UL THP BUSYHOUR");
+            entity.Property(e => e.CaPayloadGb).HasColumnName("ca_payload_gb");
         });
 
         // PacketLoss configuration
@@ -164,6 +179,26 @@ public class ApplicationDbContext : DbContext
             entity.Property(e => e.SctpPacketLoss).HasColumnName("sctp_packet_loss");
             entity.Property(e => e.SourceFile).HasColumnName("source_file");
             entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
+            entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
+        });
+
+        // PacketLossHourly configuration
+        modelBuilder.Entity<PacketLossHourly>(entity =>
+        {
+            entity.ToTable("packet_loss_hourly", "dashboard");
+            entity.HasNoKey(); 
+
+            entity.Property(e => e.Date).HasColumnName("date_id");
+            entity.Property(e => e.HourId).HasColumnName("hour_id");
+            entity.Property(e => e.NeName).HasColumnName("ne_name");
+            entity.Property(e => e.PacketLossRatioFwd).HasColumnName("packetlossratiofwd");
+            entity.Property(e => e.PacketLossRatioRev).HasColumnName("packetlossratiorev");
+            entity.Property(e => e.TwampLatencyAvg).HasColumnName("twamp_latency_avg");
+            entity.Property(e => e.TwampPlAvg).HasColumnName("twamp_pl_avg");
+            entity.Property(e => e.TwampPlMax).HasColumnName("twamp_pl_max");
+            entity.Property(e => e.SctpPacketLoss).HasColumnName("sctp_packet_loss");
+            entity.Property(e => e.SourceFile).HasColumnName("source_file");
+            entity.Property(e => e.IngestedAt).HasColumnName("ingested_at");
         });
 
         // RefNePacketLoss configuration (materialized view)
@@ -173,6 +208,20 @@ public class ApplicationDbContext : DbContext
             entity.HasNoKey();
             
             entity.Property(e => e.NeName).HasColumnName("ne_name");
+        });
+
+        // GsmDay configuration
+        modelBuilder.Entity<GsmDay>(entity =>
+        {
+            entity.ToTable("2G_daily_kpi", "dashboard");
+            entity.HasNoKey();
+        });
+
+        // RefGsmDay configuration
+        modelBuilder.Entity<RefGsmDay>(entity =>
+        {
+            entity.ToTable("mv_ref_2g_day", "dashboard");
+            entity.HasNoKey();
         });
     }
 }

@@ -81,6 +81,10 @@ public class SectorKpiDto
     // Bottom KPIs - Traffic first, then Payload
     public KpiChartDto TrafficErl { get; set; } = new();
     public KpiChartDto PayloadMb { get; set; } = new();
+    
+    // New KPIs - Active User DL and QPSK
+    public KpiChartDto ActiveUserDl { get; set; } = new();
+    public KpiChartDto Qpsk { get; set; } = new();
 }
 
 /// <summary>
@@ -115,4 +119,45 @@ public class AggregatedSectorKpiDto
     public KpiChartDto Sector1 { get; set; } = new();
     public KpiChartDto Sector2 { get; set; } = new();
     public KpiChartDto Sector3 { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO for BusyHour sector containing BusyHour KPIs
+/// </summary>
+public class BusyHourSectorKpiDto
+{
+    public int SectorGroup { get; set; }
+    
+    public KpiChartDto CqiBusyhour { get; set; } = new();
+    public KpiChartDto SeBusyhour { get; set; } = new();
+    public KpiChartDto UserDlThpBusyhour { get; set; } = new();
+    public KpiChartDto UserUlThpBusyhour { get; set; } = new();
+    public KpiChartDto CellDlThpBusyhour { get; set; } = new();
+    public KpiChartDto CellUlThpBusyhour { get; set; } = new();
+    public KpiChartDto CaPayloadGb { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO for BusyHour KPI data - grouped by sector
+/// </summary>
+public class BusyHourKpiResponseDto
+{
+    public List<BusyHourSectorKpiDto> Sectors { get; set; } = new();
+}
+
+/// <summary>
+/// Response DTO for BusyHour Stacked Payload data
+/// Contains PAYLOAD GB and CA_PAYLOAD_GB with cell/sector, band, and site groupings
+/// </summary>
+public class BusyHourStackedPayloadResponseDto
+{
+    // PAYLOAD GB
+    public AggregatedSectorKpiDto PayloadGbByCell { get; set; } = new();
+    public KpiChartDto PayloadGbByBand { get; set; } = new();
+    public KpiChartDto PayloadGbBySite { get; set; } = new();
+    
+    // CA PAYLOAD GB
+    public AggregatedSectorKpiDto CaPayloadGbByCell { get; set; } = new();
+    public KpiChartDto CaPayloadGbByBand { get; set; } = new();
+    public KpiChartDto CaPayloadGbBySite { get; set; } = new();
 }
