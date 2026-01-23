@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations.Schema;
+
 namespace AuthService.Models;
 
 /// <summary>
@@ -53,6 +55,12 @@ public class LteDay
     public double? TrafficErl { get; set; }
     public double? ActiveUserDl { get; set; }
     public double? Qpsk { get; set; }
+    [Column("16qam_dl")]
+    public double? Qam16Dl { get; set; }
+    [Column("64qam_dl")]
+    public double? Qam64Dl { get; set; }
+    [Column("256qam_dl")]
+    public double? Qam256Dl { get; set; }
     
     // BusyHour KPIs
     public double? CqiBusyhour { get; set; }

@@ -93,6 +93,9 @@ public class SectorKpiDto
 public class LteDayKpiResponseDto
 {
     public List<SectorKpiDto> Sectors { get; set; } = new();
+    
+    // Aggregated Charts (Site Level)
+    public KpiChartDto McsDistribution { get; set; } = new();
 }
 
 /// <summary>

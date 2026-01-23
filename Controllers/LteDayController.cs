@@ -91,7 +91,10 @@ public class LteDayController : ControllerBase
                     x.TrafficErl,
                     x.PayloadMb,
                     x.ActiveUserDl,
-                    x.Qpsk
+                    x.Qpsk,
+                    x.Qam16Dl,
+                    x.Qam64Dl,
+                    x.Qam256Dl
                 })
                 .OrderBy(x => x.DateTime)
                 .ToListAsync();
@@ -102,7 +105,32 @@ public class LteDayController : ControllerBase
                 .GroupBy(x => x.SectorGroup!.Value)
                 .OrderBy(g => g.Key);
 
+            // Pre-calculate MCS Distribution Chart (Site Level / All Sectors Average)
+            // Order: QPSK (Yellow), 16QAM (Orange), 64QAM (Blue), 256QAM (Green)
+            var mcsDistChart = new KpiChartDto { Name = "MCS Distribution", Unit = "%" };
+            var dateGroups = rawData.GroupBy(x => x.DateTime).OrderBy(g => g.Key).ToList();
+
+            // Helper to get series data
+            List<KpiDataPointDto> GetModSeriesData(Func<dynamic, double?> selector)
+            {
+                return dateGroups.Select(g =>
+                {
+                    double? avg = g.Average(x => selector(x));
+                    return new KpiDataPointDto
+                    {
+                        Date = g.Key.HasValue ? g.Key.Value.ToString("yyyy-MM-dd") : "",
+                        Value = avg.HasValue ? Math.Round(avg.Value, 2) : (double?)null
+                    };
+                }).Where(p => p.Value.HasValue).ToList();
+            }
+
+            mcsDistChart.Series.Add(new CellSeriesDto { CellName = "QPSK", Data = GetModSeriesData(x => x.Qpsk) });
+            mcsDistChart.Series.Add(new CellSeriesDto { CellName = "16QAM_DL", Data = GetModSeriesData(x => x.Qam16Dl) });
+            mcsDistChart.Series.Add(new CellSeriesDto { CellName = "64QAM_DL", Data = GetModSeriesData(x => x.Qam64Dl) });
+            mcsDistChart.Series.Add(new CellSeriesDto { CellName = "256QAM_DL", Data = GetModSeriesData(x => x.Qam256Dl) });
+            
             var response = new LteDayKpiResponseDto();
+            response.McsDistribution = mcsDistChart;
 
             foreach (var sectorGroup in sectorGroups)
             {
@@ -133,11 +161,11 @@ public class LteDayController : ControllerBase
                     Cqi = BuildKpiChart("CQI", "", sectorData, cellNames, x => x.AvgCqi),
                     Se = BuildKpiChart("SE", "bps/Hz", sectorData, cellNames, x => x.Se),
                     // Existing KPIs - User Throughput
-                    UserDlThp = BuildKpiChart("User DL THP", "Mbps", sectorData, cellNames, x => x.UserDlThp),
-                    UserUlThp = BuildKpiChart("User UL THP", "Mbps", sectorData, cellNames, x => x.UserUlThp),
+                    UserDlThp = BuildKpiChart("User DL THP", "Kbps", sectorData, cellNames, x => x.UserDlThp),
+                    UserUlThp = BuildKpiChart("User UL THP", "Kbps", sectorData, cellNames, x => x.UserUlThp),
                     // New KPIs - below User UL THP
-                    CellDlThp = BuildKpiChart("Cell DL THP", "Mbps", sectorData, cellNames, x => x.CellDlThp),
-                    CellUlThp = BuildKpiChart("Cell UL THP", "Mbps", sectorData, cellNames, x => x.CellUlThp),
+                    CellDlThp = BuildKpiChart("Cell DL THP", "Kbps", sectorData, cellNames, x => x.CellDlThp),
+                    CellUlThp = BuildKpiChart("Cell UL THP", "Kbps", sectorData, cellNames, x => x.CellUlThp),
                     Csfb = BuildKpiChart("CSFB", "", sectorData, cellNames, x => x.Csfb),
                     // New KPIs - below CSFB
                     UlPucch = BuildKpiChart("UL PUCCH", "dBm", sectorData, cellNames, x => x.UlPucch),
@@ -246,10 +274,10 @@ public class LteDayController : ControllerBase
                     SectorGroup = sectorGroup.Key,
                     CqiBusyhour = BuildKpiChart("CQI BusyHour", "", sectorData, cellNames, x => x.CqiBusyhour),
                     SeBusyhour = BuildKpiChart("SE BusyHour", "bps/Hz", sectorData, cellNames, x => x.SeBusyhour),
-                    UserDlThpBusyhour = BuildKpiChart("User DL THP BusyHour", "Mbps", sectorData, cellNames, x => x.UserDlThpBusyhour),
-                    UserUlThpBusyhour = BuildKpiChart("User UL THP BusyHour", "Mbps", sectorData, cellNames, x => x.UserUlThpBusyhour),
-                    CellDlThpBusyhour = BuildKpiChart("Cell DL THP BusyHour", "Mbps", sectorData, cellNames, x => x.CellDlThpBusyhour),
-                    CellUlThpBusyhour = BuildKpiChart("Cell UL THP BusyHour", "Mbps", sectorData, cellNames, x => x.CellUlThpBusyhour),
+                    UserDlThpBusyhour = BuildKpiChart("User DL THP BusyHour", "Kbps", sectorData, cellNames, x => x.UserDlThpBusyhour),
+                    UserUlThpBusyhour = BuildKpiChart("User UL THP BusyHour", "Kbps", sectorData, cellNames, x => x.UserUlThpBusyhour),
+                    CellDlThpBusyhour = BuildKpiChart("Cell DL THP BusyHour", "Kbps", sectorData, cellNames, x => x.CellDlThpBusyhour),
+                    CellUlThpBusyhour = BuildKpiChart("Cell UL THP BusyHour", "Kbps", sectorData, cellNames, x => x.CellUlThpBusyhour),
                     CaPayloadGb = BuildKpiChart("CA Payload", "GB", sectorData, cellNames, x => x.CaPayloadGb)
                 };
 
