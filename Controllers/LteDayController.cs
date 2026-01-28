@@ -73,6 +73,8 @@ public class LteDayController : ControllerBase
                     x.Sar,
                     x.IntraFho,
                     x.InterFho,
+                    x.PmHoExeAttLteIntraF,
+                    x.PmHoExeAttLteInterF,
                     x.DlUtil,
                     x.UlUtil,
                     x.PrbMaxDl,
@@ -153,6 +155,8 @@ public class LteDayController : ControllerBase
                     Sar = BuildKpiChart("SAR", "%", sectorData, cellNames, x => x.Sar),
                     IntraFho = BuildKpiChart("Intra-F HO", "%", sectorData, cellNames, x => x.IntraFho),
                     InterFho = BuildKpiChart("Inter-F HO", "%", sectorData, cellNames, x => x.InterFho),
+                    PmHoExeAttLteIntraF = BuildKpiChart("pmhoexeattlteintraf", "", sectorData, cellNames, x => x.PmHoExeAttLteIntraF),
+                    PmHoExeAttLteInterF = BuildKpiChart("pmhoexeattlteinterf", "", sectorData, cellNames, x => x.PmHoExeAttLteInterF),
                     DlUtil = BuildKpiChart("DL Utilization", "%", sectorData, cellNames, x => x.DlUtil),
                     UlUtil = BuildKpiChart("UL Utilization", "%", sectorData, cellNames, x => x.UlUtil),
                     // New KPIs - below UL Utilization
@@ -432,7 +436,7 @@ public class LteDayController : ControllerBase
 
             // Fetch Data including SectorGroup
             var rawData = await query
-                .Select(x => new { x.DateTime, x.SiteId, x.Band, x.CellName, x.NeId, x.SectorGroup, x.TrafficErl, x.PayloadMb })
+                .Select(x => new { x.DateTime, x.SiteId, x.Band, x.CellName, x.NeId, x.SectorGroup, x.TrafficErl, x.PayloadGb })
                 .ToListAsync();
 
             var response = new TrafficPayloadResponseDto();
@@ -492,10 +496,10 @@ public class LteDayController : ControllerBase
             }
 
             // --- Payload Construction ---
-            response.PayloadBySite = BuildAggregatedSet("Site", "MB", rawData, x => x.SiteId, x => x.PayloadMb);
-            response.PayloadByBand = BuildAggregatedSet("Band", "MB", rawData, x => x.Band, x => x.PayloadMb);
-            response.PayloadByCell = BuildAggregatedSet("Cell", "MB", rawData, x => x.CellName, x => x.PayloadMb);
-            response.PayloadByNe   = BuildAggregatedSet("NE",   "MB", rawData, x => x.NeId, x => x.PayloadMb);
+            response.PayloadBySite = BuildAggregatedSet("Site", "GB", rawData, x => x.SiteId, x => x.PayloadGb);
+            response.PayloadByBand = BuildAggregatedSet("Band", "GB", rawData, x => x.Band, x => x.PayloadGb);
+            response.PayloadByCell = BuildAggregatedSet("Cell", "GB", rawData, x => x.CellName, x => x.PayloadGb);
+            response.PayloadByNe   = BuildAggregatedSet("NE",   "GB", rawData, x => x.NeId, x => x.PayloadGb);
 
             // --- Traffic Construction ---
             response.TrafficBySite = BuildAggregatedSet("Site", "Erl", rawData, x => x.SiteId, x => x.TrafficErl);

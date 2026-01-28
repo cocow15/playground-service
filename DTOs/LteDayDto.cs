@@ -54,7 +54,12 @@ public class SectorKpiDto
     public KpiChartDto Sssr { get; set; } = new();
     public KpiChartDto Sar { get; set; } = new();
     public KpiChartDto IntraFho { get; set; } = new();
+
     public KpiChartDto InterFho { get; set; } = new();
+
+    public KpiChartDto PmHoExeAttLteIntraF { get; set; } = new();
+    public KpiChartDto PmHoExeAttLteInterF { get; set; } = new();
+
     public KpiChartDto DlUtil { get; set; } = new();
     public KpiChartDto UlUtil { get; set; } = new();
     
