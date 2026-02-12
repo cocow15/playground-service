@@ -91,7 +91,7 @@ public class LteDayController : ControllerBase
                     x.MaxActiveUser,
                     x.MaxRrcUser,
                     x.TrafficErl,
-                    x.PayloadMb,
+                    x.PayloadGb,
                     x.ActiveUserDl,
                     x.Qpsk,
                     x.Qam16Dl,
@@ -178,7 +178,7 @@ public class LteDayController : ControllerBase
                     MaxRrcUser = BuildKpiChart("Max RRC User", "", sectorData, cellNames, x => x.MaxRrcUser),
                     // Bottom KPIs - Traffic first, then Payload
                     TrafficErl = BuildKpiChart("Traffic", "Erl", sectorData, cellNames, x => x.TrafficErl),
-                    PayloadMb = BuildKpiChart("Payload", "MB", sectorData, cellNames, x => x.PayloadMb),
+                    PayloadMb = BuildKpiChart("Payload", "MB", sectorData, cellNames, x => x.PayloadGb),
                     // New KPIs - Active User DL and QPSK
                     ActiveUserDl = BuildKpiChart("Active User DL", "", sectorData, cellNames, x => x.ActiveUserDl),
                     Qpsk = BuildKpiChart("QPSK", "%", sectorData, cellNames, x => x.Qpsk)
